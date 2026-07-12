@@ -1,0 +1,57 @@
+name: CI - Lint & Syntax Check
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  lint-and-check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install flask mysql-connector-python bcrypt flake8
+
+      - name: Create dummy config.py for import checks
+        run: |
+          cat > config.py << 'EOF'
+          DB_CONFIG = {
+              "host": "localhost",
+              "user": "ci_user",
+              "password": "ci_password",
+              "database": "finsight_db"
+          }
+
+          FLASK_CONFIG = {
+              "host": "127.0.0.1",
+              "port": 5000
+          }
+
+          EMAIL_CONFIG = {
+              "sender_email": "ci@example.com",
+              "sender_password": "ci_password",
+              "smtp_server": "smtp.example.com",
+              "smtp_port": 587
+          }
+          EOF
+
+      - name: Run flake8 (syntax errors & undefined names)
+        run: |
+          # Stop the build only on syntax errors / undefined names
+          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics --exclude=.venv
+
+      - name: Compile-check all Python files
+        run: |
+          python -m py_compile main.py database.py email_utils.py web_server.py auth/*.py
